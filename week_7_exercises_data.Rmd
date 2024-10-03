@@ -5,8 +5,8 @@ date: "2024-10-03"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 ```
 
 
@@ -15,6 +15,44 @@ This week is all about making plots and graphs in ggplot2.  The only datasets yo
 1) sttstj_fish_biomass
 2) taxonomic
 
+```{r, echo=FALSE, warning=FALSE, echo=FALSE}
+theme_Publication <- function(base_size=14, base_family="Calibri") {
+  # base_family="Calibri" could be added above in function set up...
+  # and below, next to base_size = base_size
+  library(grid)
+  library(ggthemes)
+  library(extrafont)
+  (theme_foundation(base_size=base_size)
+    + theme(plot.title = element_text(face = "bold",
+            size = rel(1.2), hjust = 0.5),
+            text = element_text(),
+            panel.background = element_rect(colour = NA),
+            panel.spacing.x = unit(8, "mm"),
+            plot.background = element_rect(colour = NA),
+            panel.border = element_rect(colour = "grey50", size = 1),
+            axis.title = element_text(face = "bold",size = rel(1)),
+            axis.title.y = element_text(angle=90,vjust =2),
+            axis.title.x = element_text(vjust = -0.2),
+            axis.text = element_text(),
+            axis.line.x = element_line(colour="grey50", size = 1),
+            axis.line.y = element_line(colour="grey50", size = 1),
+            axis.ticks = element_line(),
+            panel.grid.major = element_line(colour="#f0f0f0"),
+            panel.grid.minor = element_line(colour="#f0f0f0"),
+            legend.key = element_rect(colour = NA),
+            legend.position = "bottom",
+            legend.direction = "horizontal",
+            legend.key.size= unit(0.5, "cm"),
+            legend.margin = margin(0,0,0,0, "cm"),
+            legend.title = element_text(face="italic"),
+            plot.margin=unit(c(10,5,5,5),"mm"),
+            strip.background=element_blank(),
+            strip.text = element_text(face="plain")
+    ))}
+library(tidyverse)
+fish_biomass <- read.csv("data/sttstj_fish_biomass.csv")
+taxonomic <- read.csv("data/taxonomic.csv")
+```
 
 Inspect the sttstj_fish_biomass dataset.  It is 3 years of biomass (kg/177m2) data for 9 fish species inside the VI national park (prot = 1) and outside the national park (prot = 0). 
 
@@ -23,14 +61,99 @@ In this instance, anytime you need to group by and summarize, you can just take 
 **put all your code in the .Rmd file inside a code chunk for each question.  Annotate what you are doing so that you can reference them later.
 
 1. Create a line graph of biomass over time for Red hind ("EPI GUTT") inside the national park.
+```{r, warning=FALSE, echo=FALSE}
+fish_biomass %>% filter(SPECIES_CD == "EPI GUTT" & protected_status == 1) %>% ggplot(aes(x=YEAR, y=biomass)) + 
+  geom_line() +
+  geom_point() +
+  theme_bw()+
+  labs(title = "Red Hind Biomass Inside the National Park")
+```
 
 2. Create a point and line graph of biomass over time for Yellowtail Snapper ("OCY CHRY") outside the national park.
 
+```{r , warning=FALSE, echo=FALSE}
+fish_biomass %>%
+  filter(SPECIES_CD == "OCY CHRY" & protected_status == 0) %>%
+  ggplot(aes(x=YEAR, y=biomass)) +
+  geom_line()+
+  geom_point()+
+  labs(title = "Yellowtail Snapper Outside the National Park")+
+  theme_bw()
+```
+
 3. Create a bar graph of biomass over time for each species grouped by protected_status.  Edit the the axis and legend titles to be more insightful.
     - biomass units
-    - Scientific name instead of SPECIES_CD
     - 0 = Open, 1 = VI National Park
+    
+```{r, warning=FALSE, echo=FALSE}
+fish_biomass %>% filter(trophic == "parrotfish") %>%
+  mutate(protected_status = as.factor(protected_status)) %>%
+  group_by(protected_status, YEAR) %>%
+  summarise(avg_biomass = sum(biomass)) %>%
+  ggplot(aes(x=YEAR, y=avg_biomass, fill=protected_status))+
+  theme_Publication() +
+  geom_bar(stat = "identity", position = "dodge") +
+  #geom_errorbar(aes(ymin = avg_biomass - SEM, ymax = avg_biomass + SEM), color="grey40", position = "dodge") +
+  scale_fill_manual(values = c("darkslategray3", "lightsteelblue4"), labels = c("Outside the National Park", "Inside the Park"), name="") +
+  labs(
+    x="Survey Year",
+    y= "Average Parrotfish Biomass ± SEM",
+    title = "Inside vs. Outside Parrotfish Biomass in the VI") +
+  scale_y_continuous(expand= c(0,0)) +
+  scale_x_continuous(breaks = c(2017, 2019, 2021, 2023))
+```
     
 4. Create a bar graph of trophic-level mean biomass inside and outside VI national park for each species.
 
+```{r, warning=FALSE, echo=FALSE}
+fish_biomass %>%
+  group_by(protected_status, trophic) %>%
+  summarise(avg_biomass = mean(biomass), SEM = sd(biomass)/sqrt(length(biomass))) %>%
+  mutate(protected_status = as.factor(protected_status),
+          trophic == as.factor(trophic)) %>%
+  ggplot(aes(x=trophic, y=avg_biomass, fill=protected_status))+
+  theme_Publication() +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = avg_biomass - SEM, ymax = avg_biomass + SEM), color="grey40", position = "dodge") +
+  scale_fill_manual(values = c("darkslategray3", "lightsteelblue4"), labels = c("Outside the National Park", "Inside the Park"), name="") +
+  labs(
+    x="",
+    y= "Average Biomass ± SEM",
+    title = "Inside vs. Outside Parrotfish Biomass in the VI") +
+    scale_y_continuous(expand= c(0,0), limits = c(0,.24))
+
+
+```
+
 5. Create a point and line plot of 'grouper' biomass (+- SE) over time; inside and outside park together.
+
+```{r, warning=FALSE}
+fish_biomass %>% filter(trophic == "grouper") %>%
+  mutate(protected_status = as.factor(protected_status)) %>%
+  group_by(YEAR, protected_status) %>%
+  summarise(avg_biomass = sum(biomass), SEM = sum(SE)) %>%
+  ggplot(aes(x=YEAR, y=avg_biomass, group=protected_status)) +
+  geom_line(aes(linetype=rev(protected_status)))+
+  geom_point() +
+  geom_errorbar(aes(ymin = avg_biomass - SEM, ymax = avg_biomass + SEM), width=0.2) +
+  theme_Publication() +
+  scale_x_continuous(breaks = c(2017, 2019, 2021, 2023)) +
+  scale_linetype_manual(labels = c("Inside the Park", "Outside the National Park"), values=c("solid", "dashed"), name="") +
+   labs(
+    x="Survey Year",
+    y= "Total Grouper Biomass ± SEM",
+    title = "Inside vs. Outside Grouper Biomass in the VI")
+  
+  
+
+```
+
+
+
+
+
+
+
+
+
+
